@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photo d'animal</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, Arial, sans-serif;
+      background: #f1f6f2;
+      color: #1f2d24;
+    }
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 32px 16px;
+      text-align: center;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 24px; }
+    form { display: flex; gap: 8px; }
+    input {
+      flex: 1;
+      padding: 12px;
+      font-size: 1rem;
+      border: 1px solid #9db8a5;
+      border-radius: 8px;
+    }
+    button {
+      padding: 12px 18px;
+      font-size: 1rem;
+      color: #fff;
+      background: #2e7d4f;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:disabled { background: #8fb59f; cursor: wait; }
+    #message { min-height: 1.5em; margin: 16px 0; color: #555; }
+    #message.erreur { color: #b3261e; }
+    figure { margin: 0; }
+    img {
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .2);
+    }
+    figcaption p { margin: 8px 0; font-size: .95rem; }
+    #tags { color: #4a5f52; }
+    footer { margin-top: 32px; font-size: .85rem; color: #666; }
+    footer a, figcaption a { color: #2e7d4f; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Quelle photo d'animal veux-tu voir ?</h1>
+
+    <form id="form">
+      <input id="nom" type="text" maxlength="100" required autofocus
+             placeholder="lion, éléphant, ours polaire...">
+      <button id="bouton" type="submit">Voir la photo</button>
+    </form>
+
+    <p id="message" role="status"></p>
+
+    <figure id="resultat" hidden>
+      <img id="photo" alt="">
+      <figcaption>
+        <p id="tags"></p>
+        <p id="credit"></p>
+      </figcaption>
+    </figure>
+
+    <footer>
+      Images by <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a>
+    </footer>
+  </main>
+
+  <script>
+    const form     = document.getElementById('form');
+    const input    = document.getElementById('nom');
+    const bouton   = document.getElementById('bouton');
+    const message  = document.getElementById('message');
+    const resultat = document.getElementById('resultat');
+    const photo    = document.getElementById('photo');
+    const tagsEl   = document.getElementById('tags');
+    const creditEl = document.getElementById('credit');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const nom = input.value.trim();
+      if (!nom) return;
+
+      message.className = '';
+      message.textContent = 'Recherche en cours...';
+      resultat.hidden = true;
+      bouton.disabled = true;
+
+      try {
+        const rep  = await fetch('/animaux/' + encodeURIComponent(nom));
+        const data = await rep.json();
+
+        if (!rep.ok) {
+          message.className = 'erreur';
+          message.textContent = data.error || ('Erreur ' + rep.status);
+          return;
+        }
+
+        photo.src = data.image_url;
+        photo.alt = 'Photo de ' + data.animal;
+
+        // Premiers mots-clés, sans doublons
+        const tags = [...new Set(data.tags.split(',').map(t => t.trim()))].slice(0, 6);
+        tagsEl.textContent = tags.join(' · ');
+
+        // Crédit photographe (textContent : jamais de HTML venant de l'API)
+        creditEl.textContent = 'Photo : ' + data.photographe + ' sur ';
+        const lien = document.createElement('a');
+        lien.textContent = 'Pixabay';
+        lien.target = '_blank';
+        lien.rel = 'noopener';
+        lien.href = String(data.page_source).startsWith('https://pixabay.com/')
+          ? data.page_source
+          : 'https://pixabay.com';
+        creditEl.appendChild(lien);
+
+        message.textContent = data.source === 'cache'
+          ? 'Photo déjà en stock sur ton serveur.'
+          : 'Photo téléchargée depuis Pixabay et enregistrée.';
+        resultat.hidden = false;
+      } catch (err) {
+        message.className = 'erreur';
+        message.textContent = 'Impossible de joindre le serveur.';
+      } finally {
+        bouton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
